@@ -1,0 +1,1 @@
+python -m pipenv run unletterboxify.py %1
