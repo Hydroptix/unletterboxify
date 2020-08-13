@@ -5,22 +5,67 @@ from moviepy.video.fx.crop import crop
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from sys import argv
 
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
 # Videos aren't perfect with color, so if it's mostly black ignore it
-R_THRESHOLD = 7
-G_THRESHOLD = 7
-B_THRESHOLD = 7
+R_THRESHOLD = 5
+G_THRESHOLD = 5
+B_THRESHOLD = 5
+MAX_NONBLACK = 1
+
+IGNORE_STEAM_FPS = True
+STEAM_FPS_VERTICAL_OFFSET = 6
+STEAM_FPS_HORIZONTAL_OFFSET = 5
+STEAM_FPS_HEIGHT = 10
+# This one is an overestimate because people with 200+ fps exist
+# Also an overestimate because the offset is different depending on whether the
+# FPS counter is on the left or right side
+STEAM_FPS_WIDTH = 60
+
+
+def in_steam_fps_box(column: int, row: int, width: int, height: int) -> bool:
+    return \
+        ((column <= STEAM_FPS_HORIZONTAL_OFFSET + STEAM_FPS_WIDTH and column >= STEAM_FPS_HORIZONTAL_OFFSET and  # left
+
+          ((row >= STEAM_FPS_VERTICAL_OFFSET and row <= STEAM_FPS_VERTICAL_OFFSET + STEAM_FPS_HEIGHT) or  # top
+
+           (row >= height - (STEAM_FPS_VERTICAL_OFFSET + STEAM_FPS_HEIGHT) and  # bottom
+            row <= height - STEAM_FPS_VERTICAL_OFFSET))) or
+
+         (column <= width - STEAM_FPS_HORIZONTAL_OFFSET and  # right
+          column >= width - (STEAM_FPS_HORIZONTAL_OFFSET + STEAM_FPS_WIDTH) and
+
+          ((row >= STEAM_FPS_VERTICAL_OFFSET and  # top
+            row <= STEAM_FPS_VERTICAL_OFFSET + STEAM_FPS_HEIGHT) or
+
+           (row >= height - (STEAM_FPS_VERTICAL_OFFSET + STEAM_FPS_HEIGHT)  # bottom
+            and row <= height - STEAM_FPS_VERTICAL_OFFSET))))
 
 
 def get_left_edge(frame) -> int:
     height = len(frame)
     width = len(frame[0])
 
+    non_black_count = 0
+
     for column in range(width):
         for row in range(height):
-            if frame[row][column][0] > R_THRESHOLD or \
-                    frame[row][column][1] > G_THRESHOLD or \
-                    frame[row][column][2] > B_THRESHOLD:
-                return column
+            if (frame[row][column][0] > R_THRESHOLD or
+                    frame[row][column][1] > G_THRESHOLD or
+                    frame[row][column][2] > B_THRESHOLD):
+
+                if IGNORE_STEAM_FPS and in_steam_fps_box(column, row, width, height):
+                    LOGGER.debug(f"Ignored nonblack pixel ({column}, {row}) in FPS region")
+
+                else:
+                    non_black_count += 1
+
+                    LOGGER.debug(f"Nonblack pixel at column {column}")
+
+                    if non_black_count > MAX_NONBLACK:
+                        return column
 
 
 def get_right_edge(frame, width: int = None, height: int = None) -> int:
@@ -30,24 +75,48 @@ def get_right_edge(frame, width: int = None, height: int = None) -> int:
     if width is None:
         width = len(frame[0])
 
+    non_black_count = 0
+
     for column in reversed(range(width)):
         for row in range(height):
-            if frame[row][column][0] > R_THRESHOLD or \
-                    frame[row][column][1] > G_THRESHOLD or \
-                    frame[row][column][2] > B_THRESHOLD:
-                return column
+            if (frame[row][column][0] > R_THRESHOLD or
+                 frame[row][column][1] > G_THRESHOLD or
+                 frame[row][column][2] > B_THRESHOLD):
+
+                if IGNORE_STEAM_FPS and in_steam_fps_box(column, row, width, height):
+                    LOGGER.debug(f"Ignored nonblack pixel ({column}, {row}) in FPS region")
+
+                else:
+                    non_black_count += 1
+
+                    LOGGER.debug(f"Nonblack pixel at column {column}")
+
+                    if non_black_count > MAX_NONBLACK:
+                        return column
 
 
 def get_bottom_edge(frame) -> int:
     height = len(frame)
     width = len(frame[0])
 
+    non_black_count = 0
+
     for row in range(height):
         for column in range(width):
-            if frame[row][column][0] > R_THRESHOLD or \
-                    frame[row][column][1] > G_THRESHOLD or \
-                    frame[row][column][2] > B_THRESHOLD:
-                return row
+            if (frame[row][column][0] > R_THRESHOLD or
+                    frame[row][column][1] > G_THRESHOLD or
+                    frame[row][column][2] > B_THRESHOLD):
+
+                if IGNORE_STEAM_FPS and in_steam_fps_box(column, row, width, height):
+                    LOGGER.debug(f"Ignored nonblack pixel ({column}, {row}) in FPS region")
+
+                else:
+                    non_black_count += 1
+
+                    LOGGER.debug(f"Nonblack pixel at row {row}")
+
+                    if non_black_count > MAX_NONBLACK:
+                        return row
 
 
 def get_top_edge(frame, width: int = None, height: int = None) -> int:
@@ -57,12 +126,24 @@ def get_top_edge(frame, width: int = None, height: int = None) -> int:
     if width is None:
         width = len(frame[0])
 
+    non_black_count = 0
+
     for row in reversed(range(height)):
         for column in range(width):
-            if frame[row][column][0] > R_THRESHOLD or \
-                    frame[row][column][1] > G_THRESHOLD or \
-                    frame[row][column][2] > B_THRESHOLD:
-                return row
+            if (frame[row][column][0] > R_THRESHOLD or
+                    frame[row][column][1] > G_THRESHOLD or
+                    frame[row][column][2] > B_THRESHOLD):
+
+                if IGNORE_STEAM_FPS and in_steam_fps_box(column, row, width, height):
+                    LOGGER.debug(f"Ignored nonblack pixel ({column}, {row}) in FPS region")
+
+                else:
+                    non_black_count += 1
+
+                    LOGGER.debug(f"Nonblack pixel at row {row}")
+
+                    if non_black_count > MAX_NONBLACK:
+                        return row
 
 
 def main(path: str) -> int:
@@ -73,11 +154,10 @@ def main(path: str) -> int:
         return (2)
 
     with VideoFileClip(str(path)) as clip:
-        first_frame = clip.get_frame(0)
-        middle_frame = clip.get_frame(clip.duration / 2)
-        # I don't know exactly where the last frame is, so rounding down to the next whole number is probably good
-        # enough for this
-        last_frame = clip.get_frame(round(clip.duration, 0))
+        first_frame = clip.get_frame(clip.duration * .1)
+        middle_frame = clip.get_frame(clip.duration * .5)
+        # Not picking the exact first/last frame to avoid weird color values at the boundaries
+        last_frame = clip.get_frame(clip.duration * .9)
 
         height = len(first_frame)
         width = len(first_frame[0])
@@ -108,19 +188,23 @@ def main(path: str) -> int:
         bottom_edge = median([first_bottom, middle_bottom, last_bottom])
 
         print(f"Cropped resolution: {right_edge - left_edge + 1}x{top_edge - bottom_edge + 1}")
-        #print(left_edge)
-        #print(right_edge)
-        #print(top_edge)
-        #print(bottom_edge)
+        # print(left_edge)
+        # print(right_edge)
+        # print(top_edge)
+        # print(bottom_edge)
 
         cropped_clip = crop(clip, x1=left_edge, y1=bottom_edge, x2=right_edge, y2=top_edge)
 
         cropped_clip.write_videofile(str(path.with_suffix("")) + "_cropped" + str(path.suffix))
 
-        return(0)
+        return (0)
+
 
 if __name__ == "__main__":
     if len(argv) != 2:
         print("Expects exactly 1 argument: filename")
         exit(1)
+
+    logging.basicConfig(level=logging.DEBUG)
+
     exit(main(argv[1]))
