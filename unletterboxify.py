@@ -161,7 +161,7 @@ def main(path: str) -> int:
 
         height = len(first_frame)
         width = len(first_frame[0])
-        print(f"Original resolution: {width}x{height}")
+        LOGGER.info(f"Original resolution: {width}x{height}")
 
         # Magic of cache I call on you now, check these three frames one at a time
         first_left = get_left_edge(first_frame)
@@ -187,7 +187,7 @@ def main(path: str) -> int:
         top_edge = median([first_top, middle_top, last_top])
         bottom_edge = median([first_bottom, middle_bottom, last_bottom])
 
-        print(f"Cropped resolution: {right_edge - left_edge + 1}x{top_edge - bottom_edge + 1}")
+        LOGGER.info(f"Cropped resolution: {right_edge - left_edge + 1}x{top_edge - bottom_edge + 1}")
         # print(left_edge)
         # print(right_edge)
         # print(top_edge)
@@ -205,6 +205,6 @@ if __name__ == "__main__":
         print("Expects exactly 1 argument: filename")
         exit(1)
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig()
 
     exit(main(argv[1]))
